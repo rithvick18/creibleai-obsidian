@@ -1,0 +1,106 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #131318;
+    color: #e4e1e9;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  }
+  
+  .glass-panel {
+    backdrop-filter: blur(24px);
+    background: rgba(31, 31, 37, 0.7);
+  }
+  
+  .nebula-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    filter: blur(120px);
+    z-index: -1;
+    opacity: 0.15;
+  }
+
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Prose overrides for markdown */
+  .prose-creible {
+    @apply text-on-surface-variant text-sm leading-7;
+  }
+  .prose-creible h1,
+  .prose-creible h2,
+  .prose-creible h3,
+  .prose-creible h4 {
+    @apply text-on-surface font-semibold mt-6 mb-3;
+  }
+  .prose-creible p {
+    @apply my-2;
+  }
+  .prose-creible ul,
+  .prose-creible ol {
+    @apply ml-5 my-2 space-y-1;
+  }
+  .prose-creible li {
+    @apply text-on-surface-variant;
+  }
+  .prose-creible code {
+    @apply bg-surface-container-high text-primary px-1.5 py-0.5 rounded text-xs font-mono;
+  }
+  .prose-creible pre {
+    @apply bg-surface-dim border border-outline-variant rounded-xl p-4 my-4 overflow-x-auto;
+  }
+  .prose-creible pre code {
+    @apply bg-transparent text-on-surface p-0;
+  }
+  .prose-creible blockquote {
+    @apply border-l-2 border-outline-variant pl-4 italic text-on-surface-variant/70 my-4;
+  }
+  .prose-creible a {
+    @apply text-primary underline underline-offset-2 hover:text-primary-fixed transition-colors;
+  }
+  .prose-creible strong {
+    @apply font-semibold text-white;
+  }
+
+  /* Pulse animation for loading */
+  @keyframes thinking-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  .animate-thinking {
+    animation: thinking-pulse 1.5s ease-in-out infinite;
+  }
+}
