@@ -92,7 +92,7 @@ export const analyzeQuery = async (
     systemInstruction = NORMAL_SYSTEM_INSTRUCTION;
   }
 
-  fullPrompt = contextText.trim()
+  fullPrompt = (mode !== 'normal' && contextText.trim())
     ? `<context>\n${contextText}\n</context>\n\nUser Query: ${userQuery}`
     : `User Query: ${userQuery}`;
 
