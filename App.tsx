@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import ContextPanel from './components/ContextPanel'; // Acts as Right Pane (Document)
-import ChatPanel from './components/ResponseViewer'; // Acts as Left Pane (Chat)
+import ContextPanel from './components/ContextPanel';
+import ChatPanel from './components/ResponseViewer';
 import Header from './components/Header';
-import AuthScreen from './components/AuthScreen';
 import HistorySidebar from './components/HistorySidebar';
 import CursorEffects from './components/CursorEffects';
-import SecurityScreen from './components/SecurityScreen';
-import EnterpriseScreen from './components/EnterpriseScreen';
 import SettingsScreen from './components/SettingsScreen';
-import { ChatMessage, ChatSession } from './types';
-import { analyzeQuery } from './services/geminiService';
+import SettingsModal from './components/SettingsModal';
+import Dashboard from './components/Dashboard';
+import { ChatMessage, ChatSession, AppSettings } from './types';
+import { analyzeQuery } from './services/aiService';
 import { DEFAULT_CONTEXT } from './constants';
 
 const App: React.FC = () => {
   // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(false);
 
   // Layout State
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [currentView, setCurrentView] = useState<'chat' | 'security' | 'enterprise' | 'settings'>('chat');
+  const [currentView, setCurrentView] = useState<'chat' | 'settings'>('chat');
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
 
   // Application State
   const [contextText, setContextText] = useState<string>(DEFAULT_CONTEXT);
@@ -28,17 +28,27 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [mode, setMode] = useState<'normal' | 'clinical' | 'legal'>('normal');
 
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = localStorage.getItem('creible_settings');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return {
+      provider: 'gemini',
+      geminiKey: '',
+      mistralKey: '',
+      grokKey: '',
+      geminiModel: 'gemini-2.5-flash',
+      mistralModel: 'mistral-large-latest'
+    };
+  });
+
   // History State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Initialize Auth & History
   useEffect(() => {
-    const session = localStorage.getItem('creible_session');
-    if (session) {
-      setIsAuthenticated(true);
-    }
-
     const savedHistory = localStorage.getItem('creible_history');
     if (savedHistory) {
       try {
@@ -47,8 +57,6 @@ const App: React.FC = () => {
         console.error("Failed to parse history", e);
       }
     }
-
-    setIsAuthChecking(false);
   }, []);
 
   // Save history on change
@@ -58,26 +66,126 @@ const App: React.FC = () => {
     }
   }, [sessions, isAuthenticated]);
 
-  const handleLogin = () => {
-    localStorage.setItem('creible_session', 'true');
-    setIsAuthenticated(true);
-  };
+  useEffect(() => {
+    localStorage.setItem('creible_settings', JSON.stringify(settings));
+  }, [settings]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('creible_session');
-    setIsAuthenticated(false);
-    setMessages([]);
-    setCurrentQuery('');
-    setMode('normal');
-    setCurrentSessionId(null);
-  };
+
 
   // Session Management
-  const handleNewChat = () => {
+  const handleNewChat = (initialPrompt: string = '') => {
     setMessages([]);
-    setCurrentQuery('');
+    setCurrentQuery(initialPrompt);
     setCurrentSessionId(null);
-    // Optionally reset context if desired, but keeping previous context is usually better UX
+    if (initialPrompt) {
+      // If there's an initial prompt, trigger send after a brief delay to allow state to update
+      setTimeout(() => {
+        handleSendWithQuery(initialPrompt);
+      }, 0);
+    }
+  };
+
+  // Helper: get active key for the current provider
+  const getActiveKey = (s: AppSettings): string => {
+    if (s.provider === 'gemini') return s.geminiKey;
+    if (s.provider === 'mistral') return s.mistralKey;
+    return s.grokKey;
+  };
+
+  const handleSendWithQuery = async (query: string) => {
+    if (!query.trim() || isLoading) return;
+
+    // Auto-open settings modal if no API key is saved
+    if (!getActiveKey(settings).trim()) {
+      setIsSettingsModalOpen(true);
+      return;
+    }
+
+    setCurrentQuery('');
+    setIsLoading(true);
+
+    // Create User Message
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: query,
+      timestamp: Date.now()
+    };
+    
+    // Optimistic Update for UI
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+
+    // Handle Session Creation/Update immediately for user message
+    let sessionId = currentSessionId;
+    let currentSessionList = [...sessions];
+
+    if (!sessionId) {
+      sessionId = Date.now().toString();
+      setCurrentSessionId(sessionId);
+      const newSession: ChatSession = {
+        id: sessionId,
+        title: query.slice(0, 30) + (query.length > 30 ? '...' : ''),
+        messages: updatedMessages,
+        timestamp: Date.now(),
+        mode: mode
+      };
+      currentSessionList = [newSession, ...currentSessionList];
+    } else {
+      currentSessionList = currentSessionList.map(s => 
+        s.id === sessionId ? { ...s, messages: updatedMessages, timestamp: Date.now() } : s
+      );
+      // Move current session to top
+      const currentSession = currentSessionList.find(s => s.id === sessionId);
+      if (currentSession) {
+         currentSessionList = [currentSession, ...currentSessionList.filter(s => s.id !== sessionId)];
+      }
+    }
+    setSessions(currentSessionList);
+
+    try {
+      const result = await analyzeQuery(contextText, query, mode, settings);
+      
+      const aiMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: result.answer,
+        thinking: result.thinking,
+        verificationStatus: result.verificationStatus,
+        sources: result.sources,
+        timestamp: Date.now()
+      };
+
+      const finalMessages = [...updatedMessages, aiMsg];
+      setMessages(finalMessages);
+
+      // Final update to session with AI response
+      setSessions(prev => {
+        const list = prev.map(s => 
+          s.id === sessionId ? { ...s, messages: finalMessages } : s
+        );
+        // Ensure order is preserved (active on top)
+        const active = list.find(s => s.id === sessionId);
+        const rest = list.filter(s => s.id !== sessionId);
+        return active ? [active, ...rest] : list;
+      });
+
+    } catch (err: any) {
+      const errorMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Error: ${err.message || "An unexpected error occurred."}`,
+        timestamp: Date.now()
+      };
+      const errorMessages = [...updatedMessages, errorMsg];
+      setMessages(errorMessages);
+      
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId ? { ...s, messages: errorMessages } : s
+      ));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSelectSession = (id: string) => {
@@ -103,6 +211,12 @@ const App: React.FC = () => {
 
   const handleSend = async () => {
     if (!currentQuery.trim() || isLoading) return;
+
+    // Auto-open settings modal if no API key is saved
+    if (!getActiveKey(settings).trim()) {
+      setIsSettingsModalOpen(true);
+      return;
+    }
 
     const query = currentQuery;
     setCurrentQuery('');
@@ -148,7 +262,7 @@ const App: React.FC = () => {
     setSessions(currentSessionList);
 
     try {
-      const result = await analyzeQuery(contextText, query, mode);
+      const result = await analyzeQuery(contextText, query, mode, settings);
       
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -192,29 +306,26 @@ const App: React.FC = () => {
     }
   };
 
-  if (isAuthChecking) {
-    return <div className="h-screen w-screen bg-[#050505]"></div>;
-  }
 
-  if (!isAuthenticated) {
-    return <AuthScreen onLogin={handleLogin} />;
-  }
 
   const isPaneVisible = (mode === 'clinical' || mode === 'legal') && !isSidebarOpen;
+  const showDashboard = currentView === 'chat' && messages.length === 0;
 
   return (
     <div className="h-screen w-screen overflow-hidden font-body bg-[#131318] text-[#e4e1e9] selection:bg-primary/30 relative">
       <CursorEffects />
 
-      <Header 
-        mode={mode} 
-        setMode={setMode} 
-        onLogout={handleLogout} 
-        toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        isSidebarOpen={isSidebarOpen}
-        currentView={currentView}
-        setView={setCurrentView}
-      />
+      {currentView !== 'settings' && (
+        <Header 
+          mode={mode} 
+          setMode={setMode} 
+          toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          isSidebarOpen={isSidebarOpen}
+          currentView={currentView}
+          setView={setCurrentView}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+        />
+      )}
 
       <HistorySidebar 
         isOpen={isSidebarOpen} 
@@ -228,9 +339,20 @@ const App: React.FC = () => {
       />
 
       {/* Main Content Canvas */}
-      <main className={`h-screen w-full flex flex-col relative transition-all duration-500 ${isSidebarOpen ? 'md:pl-64' : 'pl-0'}`}>
+      <main className={`h-screen w-full flex flex-col relative transition-all duration-500 ${isSidebarOpen ? 'md:pl-72' : 'pl-0'}`}>
         
-        {currentView === 'chat' && (
+        {showDashboard && (
+          <Dashboard 
+            onNewChat={(prompt) => { handleNewChat(prompt); setCurrentView('chat'); }}
+            setView={setCurrentView}
+            settings={settings}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
+            mode={mode}
+            setMode={setMode}
+          />
+        )}
+
+        {currentView === 'chat' && !showDashboard && (
           <div className={`flex-1 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-500 pt-20 ${isPaneVisible ? 'md:pr-[400px]' : ''}`}>
             <ChatPanel 
               messages={messages} 
@@ -258,11 +380,17 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {currentView === 'security' && <SecurityScreen />}
-        {currentView === 'enterprise' && <EnterpriseScreen />}
-        {currentView === 'settings' && <SettingsScreen />}
+        {currentView === 'settings' && <SettingsScreen settings={settings} setSettings={setSettings} />}
 
       </main>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        settings={settings}
+        setSettings={setSettings}
+      />
 
     </div>
   );

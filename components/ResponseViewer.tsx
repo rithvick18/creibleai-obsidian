@@ -16,7 +16,7 @@ interface ChatPanelProps {
   setMode: (mode: 'normal' | 'clinical' | 'legal') => void;
   isSidebarOpen: boolean;
   isPaneVisible: boolean;
-  setView: (view: 'chat' | 'security' | 'enterprise' | 'settings') => void;
+  setView: (view: 'chat' | 'settings') => void;
   setContextText: (text: string) => void;
   onCloseSidebar: () => void;
 }
@@ -251,19 +251,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
       {/* Bottom Input Section - Refined Glassmorphism */}
       <div className={`fixed bottom-0 py-10 flex justify-center z-50 transition-all duration-500 ease-in-out pointer-events-none px-8 ${
-        isSidebarOpen ? 'left-64 right-0' : (isPaneVisible ? 'left-0 right-[400px]' : 'left-0 right-0')
+        isSidebarOpen ? 'left-72 right-0' : (isPaneVisible ? 'left-0 right-[400px]' : 'left-0 right-0')
       }`}>
         <div className="max-w-5xl w-full flex flex-col items-center pointer-events-auto">
           <div className="relative w-full group">
-            {/* Subtle glow behind input */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#00E5FF]/20 to-[#941da8]/20 rounded-[24px] blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-1000"></div>
+            {/* Enhanced background glow on focus */}
+            <div className="absolute -inset-1.5 bg-gradient-to-r from-[#00E5FF]/20 to-secondary/20 rounded-[28px] blur-3xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-1000 pointer-events-none"></div>
             
-            <div className="relative flex flex-col bg-[#131318]/90 backdrop-blur-3xl rounded-[24px] border border-white/10 shadow-2xl overflow-hidden transition-all duration-500 group-focus-within:border-[#00E5FF]/30">
+            <div className="relative flex flex-col glass-panel rounded-[24px] border border-white/10 shadow-[0_25px_60px_rgba(0,0,0,0.7)] overflow-hidden transition-all duration-500 group-focus-within:border-[#00E5FF]/30 group-focus-within:shadow-[0_25px_60px_rgba(0,0,0,0.85),inset_0_0_25px_rgba(0,229,255,0.03)] focus-within:ring-1 focus-within:ring-[#00E5FF]/10">
               
               {/* Toolbar */}
-              <div className="flex items-center justify-between px-5 pt-4 pb-2 border-b border-white/[0.03]">
+              <div className="flex items-center justify-between px-6 pt-4 pb-2 border-b border-white/[0.03]">
                 <div className="flex items-center gap-1.5">
-                  <div onClick={handleModeToggle} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/5 cursor-pointer hover:border-[#00E5FF]/40 transition-all active:scale-95 group/mode">
+                  <div onClick={handleModeToggle} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/5 cursor-pointer hover:border-[#00E5FF]/40 transition-all active:scale-95 group/mode shadow-inner">
                     <span className="material-symbols-outlined text-[14px] text-[#00E5FF]">{mode === 'clinical' ? 'stethoscope' : mode === 'legal' ? 'balance' : 'rocket_launch'}</span>
                     <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{mode} Mode</span>
                   </div>
@@ -279,7 +279,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                    />
 
                    {attachedFileName ? (
-                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E5FF]/10 border border-[#00E5FF]/20 animate-in fade-in duration-300">
+                     <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E5FF]/10 border border-[#00E5FF]/20 animate-in fade-in zoom-in-95 duration-300">
                        <span className="material-symbols-outlined text-[14px] text-[#00E5FF]">description</span>
                        <span className="text-[10px] font-bold text-[#00E5FF] uppercase tracking-widest max-w-[120px] truncate">{attachedFileName}</span>
                        <button
@@ -290,9 +290,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                    ) : (
                      <button
                        onClick={() => fileInputRef.current?.click()}
-                       className="text-[10px] font-bold text-white/30 hover:text-[#00E5FF] uppercase tracking-widest transition-colors flex items-center gap-1.5"
+                       className="text-[10px] font-bold text-white/30 hover:text-[#00E5FF] uppercase tracking-widest transition-colors flex items-center gap-1.5 group/attach"
                      >
-                       <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                       <span className="material-symbols-outlined text-[16px] group-hover/attach:rotate-12 transition-transform">attach_file</span>
                        Attach Data
                      </button>
                    )}
@@ -300,20 +300,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                    <div className="w-[1px] h-3 bg-white/10"></div>
                    <button
                      onClick={() => setView('settings')}
-                     className="material-symbols-outlined text-[18px] text-white/30 hover:text-white transition-colors"
+                     className="material-symbols-outlined text-[18px] text-white/30 hover:text-white transition-all hover:rotate-45"
                    >settings</button>
                 </div>
               </div>
 
               {/* Input Area */}
-              <div className="flex items-end gap-3 p-5 pt-2">
+              <div className="flex items-end gap-3 p-5 pt-3">
                 <textarea 
                   ref={inputRef}
-                  className="w-full bg-transparent border-none focus:ring-0 outline-none text-white placeholder:text-white/20 resize-none py-2 font-body text-[16px] leading-relaxed custom-scrollbar max-h-[200px]"
+                  className="w-full bg-transparent border-none focus:ring-0 outline-none text-white placeholder:text-white/20 resize-none py-2 font-body text-[16px] leading-[1.6] custom-scrollbar max-h-[240px]"
                   placeholder={`Consult Creíble (${mode.charAt(0).toUpperCase() + mode.slice(1)} Engine)...`} 
-                  rows={currentQuery.split('\n').length > 1 ? (currentQuery.split('\n').length > 8 ? 8 : currentQuery.split('\n').length) : 1}
+                  rows={1}
                   value={currentQuery}
-                  onChange={(e) => setCurrentQuery(e.target.value)}
+                  onChange={(e) => {
+                    setCurrentQuery(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
                   onKeyDown={handleKeyDown}
                   disabled={isLoading}
                 />
@@ -325,7 +329,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   <button 
                     onClick={onSend}
                     disabled={!currentQuery.trim() || isLoading}
-                    className="w-12 h-12 rounded-2xl bg-[#00E5FF] text-black flex items-center justify-center shadow-[0_0_30px_rgba(0,229,255,0.3)] hover:shadow-[0_0_50px_rgba(0,229,255,0.5)] transition-all active:scale-90 disabled:opacity-20 disabled:shadow-none disabled:active:scale-100 cursor-pointer"
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-lg active:scale-90 disabled:opacity-10 disabled:grayscale disabled:scale-95 cursor-pointer ${
+                      currentQuery.trim() 
+                      ? 'bg-[#00E5FF] text-black shadow-[0_0_25px_rgba(0,229,255,0.4)] hover:shadow-[0_0_40px_rgba(0,229,255,0.6)] hover:scale-105' 
+                      : 'bg-white/5 text-white/20'
+                    }`}
                   >
                     <span className="material-symbols-outlined font-black text-[22px]">arrow_upward</span>
                   </button>
@@ -333,10 +341,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 mt-6 opacity-30 select-none">
-             <p className="text-[9px] font-bold tracking-[0.3em] uppercase text-white/80">Certified Intelligence</p>
-             <div className="w-1 h-1 rounded-full bg-white/40"></div>
-             <p className="text-[9px] font-bold tracking-[0.3em] uppercase text-white/80">E2E Verification</p>
+          <div className="flex items-center gap-6 mt-8 opacity-40 select-none">
+             <div className="flex items-center gap-2">
+               <span className="w-1 h-1 rounded-full bg-[#00E5FF]"></span>
+               <p className="text-[9px] font-bold tracking-[0.3em] uppercase text-white/80">Certified Intelligence</p>
+             </div>
+             <div className="flex items-center gap-2">
+               <span className="w-1 h-1 rounded-full bg-secondary"></span>
+               <p className="text-[9px] font-bold tracking-[0.3em] uppercase text-white/80">E2E Verification</p>
+             </div>
           </div>
         </div>
       </div>

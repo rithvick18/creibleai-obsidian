@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { AnalysisResult } from "../types";
+import { AnalysisResult, ModelConfig, defaultModelSettings } from "../types";
 
 const CLINICAL_SYSTEM_INSTRUCTION = `
 You are **CreíbleAI**, an elite, high-stakes medical reasoning engine and diagnostic assistant. Your primary directive is **absolute clinical safety, rigorous evidence-based verifiability, and zero hallucination.**
@@ -77,16 +77,10 @@ You are **CreíbleAI**, an elite, highly advanced general intelligence assistant
 export const analyzeQuery = async (
   contextText: string,
   userQuery: string,
-  mode: 'normal' | 'clinical' | 'legal' = 'normal'
+  mode: 'normal' | 'clinical' | 'legal',
+  appSettings: any,
+  modelSettings: any = defaultModelSettings
 ): Promise<AnalysisResult> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
-
-  if (!apiKey) {
-    throw new Error("Gemini API Key is missing. Please set VITE_GEMINI_API_KEY in your .env file.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
   let fullPrompt = "";
   let systemInstruction = "";
 
@@ -102,45 +96,92 @@ export const analyzeQuery = async (
     ? `<context>\n${contextText}\n</context>\n\nUser Query: ${userQuery}`
     : `User Query: ${userQuery}`;
 
-  console.log("Analyzing query with model gemini-1.5-flash...");
-  console.log("API Key present:", !!apiKey);
+  const defaultGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: fullPrompt,
-      tools: [{ googleSearch: {} }],
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: mode === 'normal' ? 0.7 : 0.2, 
-      },
-    });
-
-    const text = response.text || "";
+  if (appSettings.provider === 'mistral') {
+    const mistralKey = appSettings.mistralKey;
+    if (!mistralKey) {
+      throw new Error("Mistral API Key is missing. Please set it in Settings.");
+    }
+    console.log(`Analyzing query with model ${appSettings.mistralModel} (Mistral)...`);
     
-    const sources: { title: string; url: string }[] = [];
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-    if (groundingMetadata && groundingMetadata.groundingChunks) {
-      groundingMetadata.groundingChunks.forEach((chunk: any) => {
-        if (chunk.web && chunk.web.uri) {
-          sources.push({ title: chunk.web.title || "Source", url: chunk.web.uri });
-        }
+    // Call Mistral API via fetch
+    try {
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${mistralKey}`
+        },
+        body: JSON.stringify({
+          model: appSettings.mistralModel || 'mistral-large-latest',
+          messages: [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: fullPrompt }
+          ],
+          temperature: mode === 'normal' ? 0.7 : 0.2
+        })
       });
+      
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Mistral API Error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const text = data.choices[0]?.message?.content || "";
+      return parseResponse(text, mode, []);
+    } catch (error) {
+       console.error("DETAILED Mistral API Error:", error);
+       throw error;
     }
-    const uniqueSources = Array.from(new Map(sources.map((item) => [item.url, item])).values());
+  } else {
+    const apiKey = appSettings.geminiKey || defaultGeminiKey;
+    if (!apiKey) {
+      throw new Error("Gemini API Key is missing. Please set it in Settings.");
+    }
 
-    return parseResponse(text, mode, uniqueSources);
-  } catch (error) {
-    console.error("DETAILED Gemini API Error:", error);
-    if (error instanceof Error) {
-      console.error("Error Message:", error.message);
-      console.error("Error Stack:", error.stack);
+    const ai = new GoogleGenAI({ apiKey });
+
+    console.log(`Analyzing query with model ${appSettings.geminiModel || 'gemini-2.5-flash'} (Gemini)...`);
+
+    try {
+      const response = await ai.models.generateContent({
+        model: appSettings.geminiModel || 'gemini-2.5-flash',
+        contents: fullPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          systemInstruction: systemInstruction,
+          temperature: mode === 'normal' ? 0.7 : 0.2, 
+        },
+      });
+
+      const text = response.text || "";
+      
+      const sources: { title: string; url: string }[] = [];
+      const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+      if (groundingMetadata && groundingMetadata.groundingChunks) {
+        groundingMetadata.groundingChunks.forEach((chunk: any) => {
+          if (chunk.web && chunk.web.uri) {
+            sources.push({ title: chunk.web.title || "Source", url: chunk.web.uri });
+          }
+        });
+      }
+      const uniqueSources = Array.from(new Map(sources.map((item) => [item.url, item])).values());
+
+      return parseResponse(text, mode, uniqueSources);
+    } catch (error) {
+      console.error("DETAILED Gemini API Error:", error);
+      if (error instanceof Error) {
+        console.error("Error Message:", error.message);
+        console.error("Error Stack:", error.stack);
+      }
+      throw error;
     }
-    throw error;
   }
 };
 
-const parseResponse = (text: string, mode: 'normal' | 'clinical' | 'legal', sources: { title: string; url: string }[]): AnalysisResult => {
+function parseResponse(text: string, mode: 'normal' | 'clinical' | 'legal', sources: { title: string; url: string }[]): AnalysisResult {
   const thinkingMatch = text.match(/<thinking>([\s\S]*?)<\/thinking>/);
   const thinking = thinkingMatch ? thinkingMatch[1].trim() : undefined;
 
