@@ -143,7 +143,7 @@ export const analyzeQuery = async (
 
     const ai = new GoogleGenAI({ apiKey });
 
-    console.log(`Analyzing query with model ${appSettings.geminiModel || 'gemini-2.5-flash'} (Gemini)...`);
+    console.log(`Analyzing query Then why dows honme page with model ${appSettings.geminiModel || 'gemini-2.5-flash'} (Gemini)...`);
 
     try {
       const response = await ai.models.generateContent({

@@ -1,6 +1,6 @@
-import React from 'react';
-import { FileText, MoreHorizontal, ShieldCheck, Lock, UploadCloud } from 'lucide-react';
-import { MEDICAL_CONTEXT, LEGAL_CONTEXT } from '../constants';
+import React, { useRef } from 'react';
+import { FileText, MoreHorizontal, ShieldCheck, Lock, UploadCloud, FileUp, Trash2 } from 'lucide-react';
+import { MEDICAL_CONTEXT, LEGAL_CONTEXT } from '../constants.js';
 
 interface ContextPanelProps {
   contextText: string;
@@ -8,6 +8,53 @@ interface ContextPanelProps {
 }
 
 const ContextPanel: React.FC<ContextPanelProps> = ({ contextText, setContextText }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      let text = '';
+      
+      if (file.type === 'text/plain' || file.name.endsWith('.md')) {
+        text = await file.text();
+      } else if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        // For PDF files, we'll need to use a PDF library
+        // For now, show a placeholder message
+        text = `PDF file "${file.name}" has been loaded.\n\nNote: PDF parsing requires additional library support. The file content will be processed when PDF parsing is implemented.\n\nFile size: ${(file.size / 1024).toFixed(2)} KB\nLast modified: ${new Date(file.lastModified).toLocaleString()}`;
+      } else if (file.type.includes('document') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+        // For Word documents
+        text = `Word document "${file.name}" has been loaded.\n\nNote: DOC/DOCX parsing requires additional library support. The file content will be processed when document parsing is implemented.\n\nFile size: ${(file.size / 1024).toFixed(2)} KB\nLast modified: ${new Date(file.lastModified).toLocaleString()}`;
+      } else {
+        // Try to read as text for other file types
+        text = await file.text();
+      }
+      
+      setContextText(text);
+      
+      // Update the document name display
+      const docNameElement = document.querySelector('.document-name');
+      if (docNameElement) {
+        docNameElement.textContent = file.name;
+      }
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('Error reading file. Please try again.');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const clearContext = () => {
+    setContextText('');
+    const docNameElement = document.querySelector('.document-name');
+    if (docNameElement) {
+      docNameElement.textContent = 'No document loaded';
+    }
+  };
   return (
     <div className="flex flex-col h-full bg-[#0A0A0A] border-l border-[#1F1F1F] relative overflow-hidden">
       
@@ -19,12 +66,28 @@ const ContextPanel: React.FC<ContextPanelProps> = ({ contextText, setContextText
           </div>
           <div>
             <h2 className="text-sm font-medium text-[#EDEDED]">Active Document:</h2>
-            <p className="text-xs text-[#A1A1AA]">Master_Services_Agreement.pdf</p>
+            <p className="text-xs text-[#A1A1AA] document-name">No document loaded</p>
           </div>
         </div>
-        <button className="p-2 text-[#A1A1AA] hover:text-white transition-colors">
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleImportClick}
+            className="p-2 text-[#A1A1AA] hover:text-white transition-colors"
+            title="Import document"
+          >
+            <FileUp className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={clearContext}
+            className="p-2 text-[#A1A1AA] hover:text-white transition-colors"
+            title="Clear context"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+          <button className="p-2 text-[#A1A1AA] hover:text-white transition-colors">
+            <MoreHorizontal className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Quick Selectors (Optional, kept for functionality) */}
@@ -74,6 +137,14 @@ const ContextPanel: React.FC<ContextPanelProps> = ({ contextText, setContextText
         </div>
       </div>
 
+    {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.md,.pdf,.doc,.docx"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
     </div>
   );
 };
