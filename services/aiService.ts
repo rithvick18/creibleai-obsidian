@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { AnalysisResult, ModelConfig, defaultModelSettings } from "../types";
+import { AnalysisResult, ChatMessage, ModelConfig, defaultModelSettings } from "../types";
 
 const CLINICAL_SYSTEM_INSTRUCTION = `
 You are **CreíbleAI**, an elite, high-stakes medical reasoning engine and diagnostic assistant. Your primary directive is **absolute clinical safety, rigorous evidence-based verifiability, and zero hallucination.**
@@ -79,9 +79,9 @@ export const analyzeQuery = async (
   userQuery: string,
   mode: 'normal' | 'clinical' | 'legal',
   appSettings: any,
-  modelSettings: any = defaultModelSettings
+  modelSettings: any = defaultModelSettings,
+  chatHistory: ChatMessage[] = []
 ): Promise<AnalysisResult> => {
-  let fullPrompt = "";
   let systemInstruction = "";
 
   if (mode === 'clinical') {
@@ -92,9 +92,10 @@ export const analyzeQuery = async (
     systemInstruction = NORMAL_SYSTEM_INSTRUCTION;
   }
 
-  fullPrompt = (mode !== 'normal' && contextText.trim())
-    ? `<context>\n${contextText}\n</context>\n\nUser Query: ${userQuery}`
-    : `User Query: ${userQuery}`;
+  // Include context in system instruction for clinical/legal modes so it persists across turns
+  if (mode !== 'normal' && contextText.trim()) {
+    systemInstruction += `\n\n<context>\n${contextText}\n</context>`;
+  }
 
   const defaultGeminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 
@@ -107,6 +108,12 @@ export const analyzeQuery = async (
     
     // Call Mistral API via fetch
     try {
+      // Build multi-turn message array from chat history
+      const historyMessages = chatHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.content
+      }));
+
       const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -117,7 +124,8 @@ export const analyzeQuery = async (
           model: appSettings.mistralModel || 'mistral-large-latest',
           messages: [
             { role: "system", content: systemInstruction },
-            { role: "user", content: fullPrompt }
+            ...historyMessages,
+            { role: "user", content: userQuery }
           ],
           temperature: mode === 'normal' ? 0.7 : 0.2
         })
@@ -146,9 +154,20 @@ export const analyzeQuery = async (
     console.log(`Analyzing query Then why dows honme page with model ${appSettings.geminiModel || 'gemini-2.5-flash'} (Gemini)...`);
 
     try {
+      // Build multi-turn contents from chat history
+      const historyContents = chatHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' as const : 'model' as const,
+        parts: [{ text: msg.content }]
+      }));
+
+      const contents = [
+        ...historyContents,
+        { role: 'user' as const, parts: [{ text: userQuery }] }
+      ];
+
       const response = await ai.models.generateContent({
         model: appSettings.geminiModel || 'gemini-2.5-flash',
-        contents: fullPrompt,
+        contents,
         config: {
           tools: [{ googleSearch: {} }],
           systemInstruction: systemInstruction,

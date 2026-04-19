@@ -144,7 +144,7 @@ const App: React.FC = () => {
     setSessions(currentSessionList);
 
     try {
-      const result = await analyzeQuery(contextText, query, mode, settings);
+      const result = await analyzeQuery(contextText, query, mode, settings, undefined, messages);
       
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -262,7 +262,7 @@ const App: React.FC = () => {
     setSessions(currentSessionList);
 
     try {
-      const result = await analyzeQuery(contextText, query, mode, settings);
+      const result = await analyzeQuery(contextText, query, mode, settings, undefined, messages);
       
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
